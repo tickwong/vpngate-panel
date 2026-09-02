@@ -294,29 +294,6 @@ proxy-groups:
     proxies:
       - "vpngate-{node.index}"
 
-dns:
-  enable: true
-  listen: {bind_ip}:{5053 + node.index}
-  enhanced-mode: fake-ip
-  fake-ip-range: 198.18.0.1/16
-  nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
-  fallback:
-    - https://dns.google/dns-query
-    - https://cloudflare-dns.com/dns-query
-  fallback-filter:
-    geoip: true
-    geoip-code: CN
-
-tun:
-  enable: true
-  stack: system
-  dns-hijack:
-    - any:53
-  auto-route: true
-  auto-detect-interface: true
-
 rules:
   - GEOIP,CN,DIRECT
   - MATCH,节点选择
@@ -377,8 +354,8 @@ def load_state() -> list[MihomoNode]:
                 api_port=d.get("api_port", 0), bind_ip=d.get("bind_ip", "0.0.0.0"),
                 last_updated=d.get("last_updated", ""),
             )
-            # 检查进程是否还在运行
-            n.status = "offline"
+            # 恢复保存的状态（lifespan 会根据状态决定是否自动重启）
+            n.status = d.get("status", "offline")
             nodes.append(n)
         return nodes
     except Exception as e:

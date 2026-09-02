@@ -163,10 +163,9 @@ async def lifespan(app: FastAPI):
         # 重新生成所有配置文件（确保代码更新后配置是最新的）
         for n in nodes:
             write_node_config(n)
-        # 尝试重启之前运行中的节点
+        # 启动所有节点
         for n in nodes:
-            if n.status in ("online", "starting"):
-                start_mihomo_node(n, MIHOMO_BIN)
+            start_mihomo_node(n, MIHOMO_BIN)
 
     if not nodes:
         await refresh_nodes()
