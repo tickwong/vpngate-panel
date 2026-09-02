@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+state.json
+panel_config.json
+configs/*.yaml
+logs/*.log
+*.dat
+*.mmdb

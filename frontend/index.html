@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VPNGate Mihomo Panel</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f1117;--bg2:#1a1d27;--bg3:#242836;
+  --border:#2e3347;--text:#e4e6f0;--text2:#8b8fa3;
+  --accent:#6c5ce7;--accent2:#a29bfe;
+  --green:#00d68f;--red:#ff6b6b;--orange:#fdcb6e;--blue:#74b9ff;
+  --radius:10px;
+}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+a{color:var(--accent2);text-decoration:none}
+
+/* ─── 登录页 ─────────────────────────────────────────────── */
+.login-page{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)}
+.login-box{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:40px;width:380px;max-width:90vw}
+.login-box h2{text-align:center;font-size:22px;margin-bottom:8px}
+.login-box .subtitle{text-align:center;color:var(--text2);font-size:13px;margin-bottom:28px}
+.login-box .form-group{margin-bottom:18px}
+.login-box label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+.login-box input{width:100%;padding:12px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none;transition:.2s}
+.login-box input:focus{border-color:var(--accent)}
+.login-box .btn{width:100%;padding:12px;background:var(--accent);border:none;border-radius:8px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;transition:.2s}
+.login-box .btn:hover{background:#7c6ef0}
+.login-box .btn:disabled{opacity:.5;cursor:not-allowed}
+.login-box .error{color:var(--red);font-size:13px;text-align:center;margin-top:12px;min-height:20px}
+
+/* ─── 头部 ──────────────────────────────────────────────── */
+.header{background:var(--bg2);border-bottom:1px solid var(--border);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.header h1{font-size:18px;font-weight:600;display:flex;align-items:center;gap:8px}
+.header h1 .icon{font-size:22px}
+.header-right{display:flex;align-items:center;gap:12px}
+.user-menu{position:relative;display:flex;align-items:center;gap:8px;cursor:pointer;padding:6px 12px;border-radius:8px;transition:.2s}
+.user-menu:hover{background:var(--bg3)}
+.user-menu .avatar{width:28px;height:28px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff}
+.dropdown{position:absolute;top:100%;right:0;margin-top:4px;background:var(--bg2);border:1px solid var(--border);border-radius:8px;min-width:160px;display:none;z-index:50;overflow:hidden}
+.dropdown.show{display:block}
+.dropdown a,.dropdown button{display:block;width:100%;padding:10px 16px;text-align:left;background:none;border:none;color:var(--text);font-size:13px;cursor:pointer;transition:.1s}
+.dropdown a:hover,.dropdown button:hover{background:var(--bg3);color:var(--accent2)}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.status-dot.on{background:var(--green);box-shadow:0 0 6px var(--green)}
+.status-dot.off{background:var(--text2)}
+.badge{padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600}
+.badge.green{background:rgba(0,214,143,.15);color:var(--green)}
+.badge.red{background:rgba(255,107,107,.15);color:var(--red)}
+.badge.orange{background:rgba(253,203,110,.15);color:var(--orange)}
+.badge.blue{background:rgba(116,185,255,.15);color:var(--blue)}
+
+/* ─── 工具栏 ──────────────────────────────────────────────── */
+.toolbar{padding:14px 28px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.btn-toolbar{padding:8px 18px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg3);color:var(--text);cursor:pointer;font-size:13px;font-weight:500;transition:.2s}
+.btn-toolbar:hover{border-color:var(--accent);color:var(--accent2)}
+.btn-toolbar.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-toolbar.primary:hover{background:#7c6ef0}
+.btn-toolbar.danger{border-color:var(--red);color:var(--red)}
+.btn-toolbar.danger:hover{background:rgba(255,107,107,.15)}
+.refresh-info{color:var(--text2);font-size:13px;margin-left:auto}
+
+/* ─── 节点卡片 ─────────────────────────────────────────── */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:16px;padding:0 28px 28px}
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:.2s}
+.card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 8px 24px rgba(108,92,231,.1)}
+.card-head{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.card-head .left{display:flex;align-items:center;gap:10px}
+.card-head .idx{background:var(--accent);color:#fff;width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700}
+.card-head .name{font-size:14px;font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card-body{padding:14px 18px}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{display:flex;flex-direction:column;gap:2px}
+.stat-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
+.stat-value{font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat-value.green{color:var(--green)}.stat-value.red{color:var(--red)}.stat-value.orange{color:var(--orange)}.stat-value.blue{color:var(--blue)}
+.card-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+.card-footer .btn-toolbar{padding:5px 12px;font-size:12px}
+
+/* ─── 模态框 ──────────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:100}
+.modal-overlay.show{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:14px;width:440px;max-width:90vw;overflow:hidden}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.modal-head h3{font-size:16px}
+.modal-close{background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1}
+.modal-body{padding:20px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+.form-group input{width:100%;padding:10px 14px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px;outline:none}
+.form-group input:focus{border-color:var(--accent)}
+.form-group .hint{font-size:11px;color:var(--text2);margin-top:4px}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end}
+
+/* ─── 设置标签页 ─────────────────────────────────────────── */
+.tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:16px}
+.tab{padding:8px 16px;font-size:13px;color:var(--text2);cursor:pointer;border-bottom:2px solid transparent;transition:.2s}
+.tab.active{color:var(--accent2);border-bottom-color:var(--accent)}
+.tab-content{display:none}.tab-content.active{display:block}
+.msg{padding:8px 12px;border-radius:8px;font-size:13px;margin-top:10px;display:none}
+.msg.success{display:block;background:rgba(0,214,143,.1);color:var(--green);border:1px solid rgba(0,214,143,.2)}
+.msg.error{display:block;background:rgba(255,107,107,.1);color:var(--red);border:1px solid rgba(255,107,107,.2)}
+
+.footer{text-align:center;padding:20px;color:var(--text2);font-size:12px;border-top:1px solid var(--border);margin-top:20px}
+.empty{text-align:center;padding:60px;color:var(--text2)}
+.empty .icon{font-size:48px;margin-bottom:12px}
+.spinner{width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;display:inline-block;vertical-align:middle;margin-right:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media(max-width:500px){.grid{grid-template-columns:1fr}.header,.toolbar,.grid{padding-left:16px;padding-right:16px}}
+</style>
+</head>
+<body>
+
+<!-- ─── 登录页 ──────────────────────────────────────────── -->
+<div id="loginPage" class="login-page">
+  <div class="login-box">
+    <h2>🌐 VPNGate Panel</h2>
+    <p class="subtitle">请登录以继续</p>
+    <form id="loginForm" onsubmit="return doLogin(event)">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="loginUser" placeholder="请输入用户名" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="loginPass" placeholder="请输入密码" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn" id="loginBtn">登 录</button>
+      <div class="error" id="loginError"></div>
+    </form>
+  </div>
+</div>
+
+<!-- ─── 主面板（默认隐藏）────────────────────────────────── -->
+<div id="mainApp" style="display:none">
+  <div class="header">
+    <h1><span class="icon">🌐</span> VPNGate Mihomo Panel</h1>
+    <div class="header-right">
+      <span><span class="status-dot on" id="wsDot"></span> <span id="wsStatus">已连接</span></span>
+      <span class="badge blue" id="nodeCount">0 节点</span>
+      <span class="badge green" id="onlineCount">0 在线</span>
+      <div class="user-menu" onclick="toggleDropdown()">
+        <span class="avatar" id="userAvatar">A</span>
+        <span id="userName">admin</span>
+        <span style="font-size:10px">▼</span>
+        <div class="dropdown" id="dropdownMenu">
+          <button onclick="openSettings()">⚙ 面板设置</button>
+          <button onclick="doLogout()">🚪 退出登录</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn-toolbar primary" onclick="refreshNodes()">🔄 刷新节点</button>
+    <button class="btn-toolbar" onclick="startAll()">▶ 全部启动</button>
+    <button class="btn-toolbar danger" onclick="stopAll()">⏹ 全部停止</button>
+    <span class="refresh-info" id="refreshInfo">等待加载...</span>
+  </div>
+
+  <div class="grid" id="nodeGrid">
+    <div class="empty"><div class="icon">📡</div><p>正在获取节点列表...</p></div>
+  </div>
+
+  <div class="footer">
+    VPNGate Mihomo Panel &bull; 增量刷新 10 分钟（在线节点不受影响） &bull; FastAPI + Mihomo
+  </div>
+</div>
+
+<!-- ─── 端口配置模态框 ─────────────────────────────────── -->
+<div class="modal-overlay" id="configModal">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>⚙ 节点配置 — <span id="modalNodeName"></span></h3>
+      <button class="modal-close" onclick="closeModal('configModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>SOCKS5 端口</label>
+        <input type="number" id="cfgSocksPort" min="1024" max="65535">
+      </div>
+      <div class="form-group">
+        <label>绑定监听 IP</label>
+        <input type="text" id="cfgBindIp" placeholder="0.0.0.0">
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn-toolbar" onclick="closeModal('configModal')">取消</button>
+      <button class="btn-toolbar primary" onclick="saveNodeConfig()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── 面板设置模态框 ─────────────────────────────────── -->
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal" style="width:500px">
+    <div class="modal-head">
+      <h3>⚙ 面板设置</h3>
+      <button class="modal-close" onclick="closeModal('settingsModal')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab(this,'tabPort')">端口设置</div>
+        <div class="tab" onclick="switchTab(this,'tabBindIp')">监听地址</div>
+        <div class="tab" onclick="switchTab(this,'tabPassword')">修改密码</div>
+      </div>
+
+      <!-- 端口设置 -->
+      <div id="tabPort" class="tab-content active">
+        <div class="form-group">
+          <label>当前面板端口</label>
+          <input type="number" id="panelPort" min="1024" max="65535" placeholder="8080">
+          <div class="hint">修改后面板会自动重启，需要用新端口重新访问</div>
+        </div>
+        <div class="form-group">
+          <label>面板监听地址</label>
+          <input type="text" id="panelHost" placeholder="0.0.0.0" disabled>
+          <div class="hint">如需修改面板监听地址，请编辑 systemd 服务文件</div>
+        </div>
+        <button class="btn-toolbar primary" onclick="changePanelPort()">💾 保存端口并重启</button>
+        <div class="msg" id="portMsg"></div>
+      </div>
+
+      <!-- 全局 SOCKS5 监听地址 -->
+      <div id="tabBindIp" class="tab-content">
+        <div class="form-group">
+          <label>全局 SOCKS5 监听 IP</label>
+          <input type="text" id="globalBindIp" placeholder="0.0.0.0">
+          <div class="hint">
+            所有节点的 SOCKS5/Mixed 端口的绑定地址。<br>
+            <code>0.0.0.0</code> = 允许所有 IP 远程访问（推荐）<br>
+            <code>127.0.0.1</code> = 仅本机访问
+          </div>
+        </div>
+        <button class="btn-toolbar primary" onclick="saveGlobalBindIp()">💾 应用到所有节点</button>
+        <div class="msg" id="bindIpMsg"></div>
+      </div>
+
+      <!-- 修改密码 -->
+      <div id="tabPassword" class="tab-content">
+        <div class="form-group">
+          <label>当前密码</label>
+          <input type="password" id="oldPassword" placeholder="请输入当前密码">
+        </div>
+        <div class="form-group">
+          <label>新密码</label>
+          <input type="password" id="newPassword" placeholder="至少 6 位">
+        </div>
+        <div class="form-group">
+          <label>确认新密码</label>
+          <input type="password" id="confirmPassword" placeholder="再次输入新密码">
+        </div>
+        <button class="btn-toolbar primary" onclick="changePassword()">🔒 修改密码</button>
+        <div class="msg" id="pwdMsg"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// 全局状态
+// ═══════════════════════════════════════════════════════════
+const API = location.origin;
+let ws = null;
+let nodes = [];
+let configNodeIdx = null;
+let authToken = '';
+
+// ═══════════════════════════════════════════════════════════
+// 认证
+// ═══════════════════════════════════════════════════════════
+async function checkAuth() {
+  // 先从 localStorage 恢复 token（用于 WebSocket）
+  authToken = localStorage.getItem('authToken') || '';
+  try {
+    const r = await fetch(API + '/api/check-auth', {credentials:'same-origin'});
+    const d = await r.json();
+    if (d.ok) {
+      showApp(d.username);
+      return;
+    }
+  } catch {}
+  showLogin();
+}
+
+function showLogin() {
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  if (ws) { ws.close(); ws = null; }
+}
+
+function showApp(username) {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('userName').textContent = username;
+  document.getElementById('userAvatar').textContent = username[0].toUpperCase();
+  loadNodes();
+  connectWS();
+}
+
+async function doLogin(e) {
+  e.preventDefault();
+  const btn = document.getElementById('loginBtn');
+  const err = document.getElementById('loginError');
+  btn.disabled = true; btn.textContent = '登录中...'; err.textContent = '';
+  try {
+    const r = await fetch(API + '/api/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        username: document.getElementById('loginUser').value,
+        password: document.getElementById('loginPass').value,
+      }),
+    });
+    const d = await r.json();
+    if (d.ok) {
+      authToken = d.token;
+      localStorage.setItem('authToken', authToken);
+      showApp(d.username);
+    } else {
+      err.textContent = d.detail || '登录失败';
+    }
+  } catch (ex) {
+    err.textContent = '网络错误';
+  }
+  btn.disabled = false; btn.textContent = '登 录';
+}
+
+async function doLogout() {
+  closeDropdown();
+  await fetch(API + '/api/logout', {method:'POST', credentials:'same-origin'});
+  authToken = '';
+  localStorage.removeItem('authToken');
+  showLogin();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 下拉菜单
+// ═══════════════════════════════════════════════════════════
+function toggleDropdown() {
+  document.getElementById('dropdownMenu').classList.toggle('show');
+}
+function closeDropdown() {
+  document.getElementById('dropdownMenu').classList.remove('show');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.user-menu')) closeDropdown();
+});
+
+// ═══════════════════════════════════════════════════════════
+// 工具函数
+// ═══════════════════════════════════════════════════════════
+function fmtSpeed(b) {
+  if (!b||b<=0) return '0 B/s';
+  const u=['B/s','KB/s','MB/s','GB/s'];let i=0,v=b;
+  while(v>=1024&&i<u.length-1){v/=1024;i++;}
+  return v.toFixed(1)+' '+u[i];
+}
+function fmtSize(b) {
+  if (!b||b<=0) return '—';
+  const u=['B','KB','MB','GB','TB'];let i=0,v=b;
+  while(v>=1024&&i<u.length-1){v/=1024;i++;}
+  return v.toFixed(1)+' '+u[i];
+}
+function statusBadge(s) {
+  const m={online:['green','● 在线'],offline:['red','○ 离线'],starting:['orange','◌ 启动中'],error:['red','✕ 错误']};
+  const [c,t]=m[s]||['red',s];
+  return `<span class="badge ${c}">${t}</span>`;
+}
+function escapeHtml(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ═══════════════════════════════════════════════════════════
+// 渲染
+// ═══════════════════════════════════════════════════════════
+function renderCards(data) {
+  nodes = data.nodes || [];
+  const grid = document.getElementById('nodeGrid');
+  if (!nodes.length) {
+    grid.innerHTML = '<div class="empty"><div class="icon">📡</div><p>暂无节点</p></div>';
+    return;
+  }
+  grid.innerHTML = nodes.map(n => `
+    <div class="card" id="card-${n.index}">
+      <div class="card-head">
+        <div class="left">
+          <span class="idx">${n.index}</span>
+          <span class="name" title="${n.name}">${n.name}</span>
+        </div>
+        ${statusBadge(n.status)}
+      </div>
+      <div class="card-body"><div class="stat-grid">
+        <div class="stat"><span class="stat-label">📍 国家</span><span class="stat-value">${n.country} (${n.country_short})</span></div>
+        <div class="stat"><span class="stat-label">📡 服务器</span><span class="stat-value blue">${n.server}</span></div>
+        <div class="stat"><span class="stat-label">📶 延迟</span><span class="stat-value ${n.ping<50?'green':n.ping<150?'orange':'red'}">${n.ping} ms</span></div>
+        <div class="stat"><span class="stat-label">⭐ 评分</span><span class="stat-value">${fmtSize(n.score)}</span></div>
+        <div class="stat"><span class="stat-label">🔼 上传</span><span class="stat-value green">${fmtSpeed(n.upload_speed)}</span></div>
+        <div class="stat"><span class="stat-label">🔽 下载</span><span class="stat-value blue">${fmtSpeed(n.download_speed)}</span></div>
+        <div class="stat"><span class="stat-label">🧦 SOCKS5</span><span class="stat-value">${n.bind_ip}:${n.socks_port}</span></div>
+        <div class="stat"><span class="stat-label">🔌 出口 IP</span><span class="stat-value">${n.ip_address||'—'}</span></div>
+      </div></div>
+      <div class="card-footer">
+        <button class="btn-toolbar" onclick="viewConfig(${n.index})" title="查看配置">📄</button>
+        <button class="btn-toolbar" onclick="openNodeConfig(${n.index})" title="端口配置">⚙</button>
+        ${n.status==='online'||n.status==='starting'
+          ? `<button class="btn-toolbar danger" onclick="stopNode(${n.index})">⏹ 停止</button>`
+          : `<button class="btn-toolbar" onclick="startNode(${n.index})">▶ 启动</button>`}
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('nodeCount').textContent = nodes.length + ' 节点';
+  document.getElementById('onlineCount').textContent = nodes.filter(n=>n.status==='online').length + ' 在线';
+  document.getElementById('refreshInfo').textContent = '最后更新: ' + data.updated_at;
+}
+
+// ═══════════════════════════════════════════════════════════
+// API 调用
+// ═══════════════════════════════════════════════════════════
+async function apiFetch(path, opts={}) {
+  try {
+    const r = await fetch(API+path, {headers:{'Content-Type':'application/json'}, credentials:'same-origin', ...opts});
+    if (r.status === 401) { showLogin(); return null; }
+    return await r.json();
+  } catch(e) { console.error('API error:',e); return null; }
+}
+
+async function refreshNodes() {
+  document.getElementById('refreshInfo').innerHTML = '<span class="spinner"></span> 刷新中...';
+  await apiFetch('/api/refresh',{method:'POST'});
+  await loadNodes();
+}
+async function loadNodes() {
+  const d = await apiFetch('/api/nodes');
+  if (d) renderCards(d);
+}
+async function startNode(i) { await apiFetch(`/api/nodes/${i}/start`,{method:'POST'}); await loadNodes(); }
+async function stopNode(i) { await apiFetch(`/api/nodes/${i}/stop`,{method:'POST'}); await loadNodes(); }
+async function startAll() { await apiFetch('/api/nodes/start-all',{method:'POST'}); await loadNodes(); }
+async function stopAll() { await apiFetch('/api/nodes/stop-all',{method:'POST'}); await loadNodes(); }
+
+async function viewConfig(idx) {
+  const d = await apiFetch(`/api/nodes/${idx}/config-view`);
+  if (d) {
+    const w = window.open('','_blank','width=700,height=600');
+    w.document.write(`<pre style="background:#1a1d27;color:#e4e6f0;padding:20px;font-size:13px;white-space:pre-wrap">${escapeHtml(d.content)}</pre>`);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// 节点端口配置弹窗
+// ═══════════════════════════════════════════════════════════
+function openNodeConfig(idx) {
+  configNodeIdx = idx;
+  const n = nodes.find(x=>x.index===idx);
+  if (!n) return;
+  document.getElementById('modalNodeName').textContent = n.name;
+  document.getElementById('cfgSocksPort').value = n.socks_port;
+  document.getElementById('cfgBindIp').value = n.bind_ip||'0.0.0.0';
+  document.getElementById('configModal').classList.add('show');
+}
+
+async function saveNodeConfig() {
+  if (!configNodeIdx) return;
+  const port = parseInt(document.getElementById('cfgSocksPort').value);
+  const ip = document.getElementById('cfgBindIp').value.trim()||'0.0.0.0';
+  if (port<1024||port>65535){alert('端口范围: 1024-65535');return;}
+  await apiFetch(`/api/nodes/${configNodeIdx}/config`,{method:'PUT',body:JSON.stringify({socks_port:port,bind_ip:ip})});
+  closeModal('configModal');
+  await loadNodes();
+}
+
+// ═══════════════════════════════════════════════════════════
+// 面板设置
+// ═══════════════════════════════════════════════════════════
+async function openSettings() {
+  closeDropdown();
+  const d = await apiFetch('/api/panel/settings');
+  if (d) {
+    document.getElementById('panelPort').value = d.port;
+    document.getElementById('panelHost').value = d.host;
+    document.getElementById('globalBindIp').value = d.global_socks_bind_ip || '0.0.0.0';
+  }
+  document.getElementById('portMsg').className='msg';document.getElementById('portMsg').textContent='';
+  document.getElementById('bindIpMsg').className='msg';document.getElementById('bindIpMsg').textContent='';
+  document.getElementById('pwdMsg').className='msg';document.getElementById('pwdMsg').textContent='';
+  document.getElementById('oldPassword').value='';
+  document.getElementById('newPassword').value='';
+  document.getElementById('confirmPassword').value='';
+  document.getElementById('settingsModal').classList.add('show');
+}
+
+function switchTab(el, tabId) {
+  el.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  el.closest('.modal-body').querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+  document.getElementById(tabId).classList.add('active');
+}
+
+async function changePanelPort() {
+  const port = parseInt(document.getElementById('panelPort').value);
+  const msg = document.getElementById('portMsg');
+  if (port<1024||port>65535){msg.className='msg error';msg.textContent='端口范围: 1024-65535';return;}
+  const d = await apiFetch('/api/panel/change-port',{method:'POST',body:JSON.stringify({port})});
+  if (d && d.ok) {
+    msg.className='msg success';msg.textContent=d.msg;
+    // 2秒后跳转到新端口
+    setTimeout(()=>{
+      const newUrl = `${location.protocol}//${location.hostname}:${port}`;
+      msg.textContent=`正在跳转到 ${newUrl} ...`;
+      setTimeout(()=>{location.href=newUrl;},1000);
+    },2000);
+  } else {
+    msg.className='msg error';msg.textContent=d?.detail||'修改失败';
+  }
+}
+
+async function saveGlobalBindIp() {
+  const ip = document.getElementById('globalBindIp').value.trim() || '0.0.0.0';
+  const msg = document.getElementById('bindIpMsg');
+  const d = await apiFetch('/api/panel/global-bind-ip',{method:'POST',body:JSON.stringify({bind_ip:ip})});
+  if (d && d.ok) {
+    msg.className='msg success';
+    msg.textContent=`已应用到 ${d.changed} 个节点，监听地址: ${d.bind_ip}`;
+    await loadNodes();
+  } else {
+    msg.className='msg error';msg.textContent=d?.detail||'保存失败';
+  }
+}
+
+async function changePassword() {
+  const old = document.getElementById('oldPassword').value;
+  const np = document.getElementById('newPassword').value;
+  const cp = document.getElementById('confirmPassword').value;
+  const msg = document.getElementById('pwdMsg');
+  if (!old){msg.className='msg error';msg.textContent='请输入当前密码';return;}
+  if (np.length<6){msg.className='msg error';msg.textContent='新密码至少6位';return;}
+  if (np!==cp){msg.className='msg error';msg.textContent='两次密码不一致';return;}
+  const d = await apiFetch('/api/panel/change-password',{method:'POST',body:JSON.stringify({old_password:old,new_password:np})});
+  if (d && d.ok) {
+    msg.className='msg success';msg.textContent=d.msg;
+    document.getElementById('oldPassword').value='';
+    document.getElementById('newPassword').value='';
+    document.getElementById('confirmPassword').value='';
+  } else {
+    msg.className='msg error';msg.textContent=d?.detail||'修改失败';
+  }
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+
+// ═══════════════════════════════════════════════════════════
+// WebSocket
+// ═══════════════════════════════════════════════════════════
+function connectWS() {
+  if (ws) ws.close();
+  const proto = location.protocol==='https:'?'wss':'ws';
+  // 通过 cookie 认证，token 也通过查询参数传递作为备份
+  ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(authToken||'')}`);
+  ws.onopen = () => {
+    document.getElementById('wsDot').className='status-dot on';
+    document.getElementById('wsStatus').textContent='已连接';
+  };
+  ws.onmessage = e => {
+    try { const d=JSON.parse(e.data); if(d.type==='status_update') renderCards(d); } catch{}
+  };
+  ws.onclose = () => {
+    document.getElementById('wsDot').className='status-dot off';
+    document.getElementById('wsStatus').textContent='已断开';
+    if (document.getElementById('mainApp').style.display!=='none') setTimeout(connectWS,3000);
+  };
+  ws.onerror = () => ws.close();
+}
+
+// 模态框点击遮罩关闭
+document.querySelectorAll('.modal-overlay').forEach(el=>{
+  el.addEventListener('click',e=>{if(e.target===el) closeModal(el.id);});
+});
+
+// ═══════════════════════════════════════════════════════════
+// 初始化
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', checkAuth);
+</script>
+</body>
+</html>
