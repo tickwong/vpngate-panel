@@ -1,6 +1,6 @@
-# VPNGate Mihomo Panel
+# softether VPNGate Mihomo Panel
 
-> 自动从 VPNGate API 获取 TOP10 节点，转换为 Mihomo 配置，提供 Web 管理面板。
+> 自动从 Softether VPNGate 获取 TOP10 公益节点，转换为 Mihomo 配置，提供 Web 管理面板。
 
 ## 功能
 
