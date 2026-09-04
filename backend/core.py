@@ -252,6 +252,40 @@ def convert_to_mihomo_nodes(vpn_nodes: list[VPNGateNode]) -> list[MihomoNode]:
     return result
 
 
+def build_mihomo_node(vn: VPNGateNode, idx: int, *,
+                      socks_port: int, mixed_port: int, api_port: int,
+                      bind_ip: str = "0.0.0.0") -> MihomoNode:
+    """从单个 VPNGateNode 构造 MihomoNode（按目标 index 精确分配端口）。
+
+    避免 convert_to_mihomo_nodes([single]) 时 index 恒为 1 导致的端口错乱。
+    """
+    name = f"{vn.country_short}-{vn.hostname}-{vn.ip}"
+    node = MihomoNode(
+        index=idx,
+        name=name,
+        server=vn.ip,
+        port=vn.remote_port,
+        proto=vn.proto,
+        cipher=vn.cipher,
+        auth=vn.auth,
+        ca=vn.ca,
+        cert=vn.cert,
+        key=vn.key,
+        country=vn.country_long,
+        country_short=vn.country_short,
+        ping=vn.ping,
+        speed=vn.speed,
+        score=vn.score,
+        socks_port=socks_port,
+        mixed_port=mixed_port,
+        api_port=api_port,
+        bind_ip=bind_ip,
+        last_updated=datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S"),
+    )
+    sync_node_name(node)
+    return node
+
+
 # ═══════════════════════════════════════════════════════════════
 # Mihomo 配置文件生成
 # ═══════════════════════════════════════════════════════════════
@@ -335,6 +369,16 @@ def _node_to_dict(n: MihomoNode) -> dict:
     }
 
 
+def sync_node_name(node: MihomoNode) -> None:
+    """强制节点标题尾部的 IP 与实际连接的 server 一致，避免标题与配置文件显示不一致"""
+    if node.server:
+        node.name = re.sub(
+            r"\d+\.\d+\.\d+\.\d+$",
+            node.server,
+            node.name,
+        )
+
+
 def load_state() -> list[MihomoNode]:
     """从磁盘恢复节点列表"""
     if not STATE_FILE.exists():
@@ -354,6 +398,8 @@ def load_state() -> list[MihomoNode]:
                 api_port=d.get("api_port", 0), bind_ip=d.get("bind_ip", "0.0.0.0"),
                 last_updated=d.get("last_updated", ""),
             )
+            # 自愈：保证标题尾部 IP 与实际连接 server 一致
+            sync_node_name(n)
             # 恢复保存的状态（lifespan 会根据状态决定是否自动重启）
             n.status = d.get("status", "offline")
             nodes.append(n)
@@ -457,24 +503,37 @@ def get_mihomo_status(index: int, api_port: int) -> dict:
 
 
 def get_traffic_stats(index: int, api_port: int) -> dict:
-    """获取实时流量统计（mihomo /traffic 返回 SSE 流，取第一行 JSON）"""
+    """获取实时流量统计（mihomo /traffic 为 SSE 流：短窗口非阻塞收集当前帧）"""
     try:
-        import urllib.request
-        import socket as _socket
-        url = f"http://127.0.0.1:{api_port}/traffic"
-        req = urllib.request.Request(url, headers={"Authorization": "Bearer vpngate" + str(index)})
-        with urllib.request.urlopen(req, timeout=2) as resp:
-            # mihomo /traffic 是 SSE 流，每行一个 JSON 对象
-            # 读取第一行即可获取最新流量数据
-            line = b""
-            while True:
-                chunk = resp.read(1)
-                if not chunk or chunk == b"\n":
-                    break
-                line += chunk
-            if line:
-                return json.loads(line)
-    except (_socket.timeout, Exception):
+        import socket
+        s = socket.create_connection(("127.0.0.1", api_port), timeout=0.5)
+        s.settimeout(0.2)
+        s.sendall((
+            f"GET /traffic HTTP/1.1\r\n"
+            f"Host: 127.0.0.1\r\n"
+            f"Authorization: Bearer vpngate{index}\r\n"
+            f"\r\n"
+        ).encode())
+        buf = b""
+        deadline = time.time() + 0.5
+        while time.time() < deadline:
+            try:
+                chunk = s.recv(2048)
+            except (socket.timeout, BlockingIOError):
+                # 无新数据（空闲节点），继续等到截止时间
+                if buf:
+                    continue
+                break
+            if not chunk:
+                break
+            buf += chunk
+        s.close()
+        # 解析最后一帧完整 JSON（跳过 HTTP header）
+        body = buf.split(b"\r\n\r\n", 1)[-1]
+        lines = [ln for ln in body.decode(errors="ignore").strip().splitlines() if ln.strip()]
+        if lines:
+            return json.loads(lines[-1])
+    except Exception:
         pass
     return {}
 

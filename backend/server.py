@@ -25,12 +25,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .core import (
-    TZ_UTC8, MAX_NODES, REFRESH_INTERVAL, BASE_DIR,
+    TZ_UTC8, MAX_NODES, REFRESH_INTERVAL, BASE_DIR, CONFIGS_DIR,
     MihomoNode, fetch_vpngate_nodes, convert_to_mihomo_nodes,
     write_node_config, save_state, load_state,
     start_mihomo_node, stop_mihomo_node, stop_all_nodes,
     check_node_alive, get_mihomo_status, get_traffic_stats,
-    get_proxies_info, _running_processes,
+    get_proxies_info, build_mihomo_node, sync_node_name, _running_processes,
     API_BASE_PORT,
 )
 
@@ -269,8 +269,7 @@ async def check_auth(user=Depends(require_auth)):
 # ═══════════════════════════════════════════════════════════════
 @app.get("/api/nodes")
 async def get_nodes(user=Depends(require_auth)):
-    for n in nodes:
-        _update_node_status(n)
+    await asyncio.gather(*[_update_status_async(n) for n in nodes])
     return {
         "updated_at": datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S"),
         "count": len(nodes),
@@ -283,7 +282,7 @@ async def get_node_detail(index: int, user=Depends(require_auth)):
     node = _find_node(index)
     if not node:
         raise HTTPException(404, f"节点 {index} 不存在")
-    _update_node_status(node)
+    await _update_status_async(node)
     return _node_detail(node)
 
 
@@ -298,7 +297,7 @@ async def start_node(index: int, req: StartRequest = StartRequest(), user=Depend
     if not ok:
         raise HTTPException(500, "启动失败，请检查 mihomo 路径和日志")
     await asyncio.sleep(1)
-    _update_node_status(node)
+    await _update_status_async(node)
     save_state(nodes)
     return {"ok": True, "node": _node_summary(node)}
 
@@ -324,7 +323,7 @@ async def start_all(req: StartRequest = StartRequest(), user=Depends(require_aut
         results.append({"index": n.index, "name": n.name, "ok": ok})
     await asyncio.sleep(2)
     for n in nodes:
-        _update_node_status(n)
+        await _update_status_async(n)
     save_state(nodes)
     return {"ok": True, "results": results}
 
@@ -361,7 +360,7 @@ async def update_node_config(index: int, cfg: PortConfig, user=Depends(require_a
         await asyncio.sleep(0.5)
         start_mihomo_node(node, MIHOMO_BIN)
         await asyncio.sleep(1)
-        _update_node_status(node)
+        await _update_status_async(node)
     return {"ok": True, "node": _node_summary(node)}
 
 
@@ -525,9 +524,9 @@ async def websocket_endpoint(ws: WebSocket):
                 "time": datetime.now(TZ_UTC8).strftime("%H:%M:%S"),
                 "nodes": [],
             }
-            for n in nodes:
-                _update_node_status(n)
-                data["nodes"].append(_node_summary(n))
+            # 并行健康检查（线程池），不阻塞事件循环
+            await asyncio.gather(*[_update_status_async(n) for n in nodes])
+            data["nodes"] = [_node_summary(n) for n in nodes]
             await ws.send_json(data)
             await asyncio.sleep(3)
     except WebSocketDisconnect:
@@ -593,6 +592,11 @@ def _update_node_status(node: MihomoNode):
             node.last_updated = datetime.now(TZ_UTC8).strftime("%Y-%m-%d %H:%M:%S")
     else:
         node.status = "starting"
+
+
+async def _update_status_async(node: MihomoNode):
+    """在线程中执行同步健康检查，避免阻塞事件循环（10 节点 × 网络超时 = 会卡死 WebSocket/页面）"""
+    await asyncio.to_thread(_update_node_status, node)
 
 
 def _check_vpn_tunnel(node: MihomoNode) -> bool:
@@ -670,7 +674,7 @@ async def refresh_offline_nodes() -> int:
 
     # 先更新所有节点状态
     for n in nodes:
-        _update_node_status(n)
+        await _update_status_async(n)
 
     offline_indices = [n.index for n in nodes if n.status in ("offline", "error")]
     online_count = len(nodes) - len(offline_indices)
@@ -702,6 +706,8 @@ async def refresh_offline_nodes() -> int:
             logger.info("没有可用的候选节点来替换离线节点")
             return len(nodes)
 
+        from .core import MIXED_BASE_PORT, API_BASE_PORT
+
         # 逐个替换离线节点
         replaced = 0
         for i, idx in enumerate(offline_indices):
@@ -712,40 +718,49 @@ async def refresh_offline_nodes() -> int:
             if not old_node or old_node.status == "online":
                 continue
 
-            # 如果旧节点正在运行，先停止
-            if idx in _running_processes:
-                stop_mihomo_node(idx)
+            # ① 彻底停止该槽位的旧进程（含面板重启后残留的孤儿进程）
+            stop_mihomo_node(idx)          # 终止跟踪中的进程
+            _kill_orphan_by_config(idx)    # pkill 兜底：按配置文件路径杀孤儿
 
-            # 保留用户的端口和 IP 配置
-            socks_port = old_node.socks_port
-            bind_ip = old_node.bind_ip
+            # ② 用目标 index 精确构造新节点（端口/标题/server 单一来源，杜绝错乱）
+            global_ip = panel_config.get("global_socks_bind_ip", "0.0.0.0")
+            new_node = build_mihomo_node(
+                vn, idx,
+                socks_port=old_node.socks_port,
+                mixed_port=MIXED_BASE_PORT + idx,
+                api_port=API_BASE_PORT + idx,
+                bind_ip=old_node.bind_ip or global_ip,
+            )
 
-            new_list = convert_to_mihomo_nodes([vn])
-            if not new_list:
-                continue
-            new_node = new_list[0]
-            # 用目标 index 重新计算所有端口（convert_to_mihomo_nodes 用的是 list index）
-            from .core import MIXED_BASE_PORT, API_BASE_PORT
-            new_node.index = idx
-            new_node.socks_port = socks_port
-            new_node.mixed_port = MIXED_BASE_PORT + idx
-            new_node.api_port = API_BASE_PORT + idx
-            new_node.bind_ip = bind_ip or panel_config.get("global_socks_bind_ip", "0.0.0.0")
-
-            # 替换
+            # ③ 替换内存 + 写配置 + 直接启动，让新节点真正上线
             node_pos = next((j for j, n in enumerate(nodes) if n.index == idx), None)
             if node_pos is not None:
                 nodes[node_pos] = new_node
                 write_node_config(new_node)
+                _restart_counts[idx] = 0
+                start_mihomo_node(new_node, MIHOMO_BIN)
                 replaced += 1
                 logger.info(f"  替换 node[{idx}]: {old_node.name} → {new_node.name}")
 
         save_state(nodes)
-        logger.info(f"增量刷新完成，在线 {online_count} 个，替换 {replaced} 个离线节点")
+        logger.info(f"增量刷新完成，在线 {online_count} 个，替换并重启 {replaced} 个离线节点")
         return len(nodes)
     except Exception as e:
         logger.error(f"增量刷新失败: {e}")
         return len(nodes)
+
+
+def _kill_orphan_by_config(index: int):
+    """按配置文件路径杀残留的孤儿 mihomo 进程（防止旧进程继续连旧 IP）"""
+    cfg = str(CONFIGS_DIR / f"node_{index}.yaml")
+    try:
+        subprocess.run(
+            ["pkill", "-f", cfg],
+            capture_output=True,
+            start_new_session=True,
+        )
+    except Exception:
+        pass
 
 
 async def _auto_refresh_loop():
@@ -763,8 +778,7 @@ async def _auto_refresh_loop():
 async def _status_monitor_loop():
     while True:
         await asyncio.sleep(10)
-        for n in nodes:
-            _update_node_status(n)
+        await asyncio.gather(*[_update_status_async(n) for n in nodes])
 
 
 # ─── 入口 ────────────────────────────────────────────────────
